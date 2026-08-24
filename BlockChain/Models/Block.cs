@@ -1,25 +1,25 @@
-﻿namespace BlockChain.Models
+﻿using System;
+using System.Collections.Generic;
+
+namespace BlockChain.Models
 {
     public class Block
     {
         public int Index { get; set; }
-
-        public DateTime TimeStamp { get; set; }
-
-        public string Data { get; set; }
-
+        public DateTime Timestamp { get; set; }
+        public List<Transaction> Transactions { get; set; }
+        public string PreviousHash { get; set; }
         public string Hash { get; set; }
+        public int Nonce { get; set; }
 
-        public string PrevHash { get; set; }
-
-        public long Nonce { get; set; }
-
-        public Block(int index, DateTime timeStamp, string data, string prevHash)
+        public Block(DateTime timestamp, List<Transaction> transactions, string previousHash = "")
         {
-            Index = index;
-            TimeStamp = timeStamp;
-            Data = data;
-            PrevHash = prevHash;
+            Index = 0;
+            Timestamp = timestamp;
+            Transactions = transactions ?? new List<Transaction>();
+            PreviousHash = previousHash;
+            Hash = string.Empty;
+            Nonce = 0;
         }
     }
 }

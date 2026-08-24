@@ -1,34 +1,26 @@
-﻿using BlockChain.Models;
+﻿using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using BlockChain.Models;
 
 namespace BlockChain.Services
 {
-    public class HashingService
+    public static class HashingService
     {
-        public string ComputeHash(Block block)
+        public static string CalculateHash(Block block)
         {
-            var input =
-                $"{block.Index}" +
-                $"{block.TimeStamp.ToString("o")}" +
-                $"{block.Data}" +
-                $"{block.PrevHash}" +
-                $"{block.Nonce}";
+            string transactionsJson = JsonSerializer.Serialize(block.Transactions);
+            string rawData = $"{block.Index}{block.Timestamp:yyyy-MM-dd HH:mm:ss.fff}{block.PreviousHash}{transactionsJson}{block.Nonce}";
 
-            return ComputeHash(input);
-        }
-
-        public string ComputeHash(string input)
-        {
-            using (var sha256 =
-                   System.Security.Cryptography.SHA256.Create())
+            using (SHA256 sha256 = SHA256.Create())
             {
-                var bytes = Encoding.UTF8.GetBytes(input);
-                var hashBytes = sha256.ComputeHash(bytes);
-
-                return BitConverter
-                    .ToString(hashBytes)
-                    .Replace("-", "")
-                    .ToLower();
+                byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+                StringBuilder builder = new StringBuilder();
+                foreach (byte b in bytes)
+                {
+                    builder.Append(b.ToString("x2"));
+                }
+                return builder.ToString();
             }
         }
     }

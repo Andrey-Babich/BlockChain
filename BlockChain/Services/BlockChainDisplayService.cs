@@ -1,37 +1,38 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using BlockChain.Models;
-using System.Threading.Tasks;
 
 namespace BlockChain.Services
 {
-    public class BlockChainDisplayService
+    public static class BlockChainDisplayService
     {
-        public void ShowBlockChain(List<Block> chain)
+        public static void DisplayChain(BlockChainService blockChain)
         {
-            foreach (var block in chain)
+            Console.WriteLine("\n=================== СТАН БЛОКЧЕЙНУ ===================");
+            foreach (Block block in blockChain.Chain)
             {
-                Console.WriteLine($"Index: {block.Index}");
-                Console.WriteLine($"TimeStamp: {block.TimeStamp}");
-                Console.WriteLine($"Data: {block.Data}");
-                Console.WriteLine($"Hash: {block.Hash}");
-                Console.WriteLine($"Previous Hash: {block.PrevHash}");
-                Console.WriteLine(new string('-', 50));
-            }
-        }
+                Console.WriteLine($"\n--- Блок #{block.Index} ---");
+                Console.WriteLine($"Час:           {block.Timestamp}");
+                Console.WriteLine($"Попередній Хеш:{block.PreviousHash}");
+                Console.WriteLine($"Хеш:           {block.Hash}");
+                Console.WriteLine($"Nonce:         {block.Nonce}");
+                Console.WriteLine("Транзакції:");
 
-        public void ShowValidationResult(bool isValid)
-        {
-            if (isValid)
-            {
-                Console.WriteLine("The blockchain is valid.");
+                if (block.Transactions.Count == 0)
+                {
+                    Console.WriteLine("  (Немає транзакцій / Генезис-блок)");
+                }
+                else
+                {
+                    foreach (Transaction tx in block.Transactions)
+                    {
+                        string sender = string.IsNullOrEmpty(tx.Sender) ? "[Системна Винагорода]" : tx.Sender;
+                        string lockInfo = tx.UnlockBlockIndex > 0 ? $" | LockUntilBlock: {tx.UnlockBlockIndex}" : "";
+                        string idShort = string.IsNullOrEmpty(tx.Id) ? "N/A" : tx.Id[..8];
+                        Console.WriteLine($"  * [{idShort}] Від: {sender} -> До: {tx.Recipient} | Сума: {tx.Amount}{lockInfo}");
+                    }
+                }
             }
-            else
-            {
-                Console.WriteLine("The blockchain is NOT valid.");
-            }
+            Console.WriteLine("\n=======================================================\n");
         }
     }
 }
