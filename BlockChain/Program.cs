@@ -10,19 +10,25 @@ namespace BlockChain
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-            BlockChainService coin = new BlockChainService(difficulty: 2, miningReward: 50);
+            BlockChainService coin = new BlockChainService(difficulty: 2, miningReward: 100);
 
             Wallet alice = new Wallet();
             Wallet bob = new Wallet();
+            Wallet charlie = new Wallet();
 
-            Console.WriteLine($"Адреса Аліси: {alice.Address}");
-            Console.WriteLine($"Адреса Боба:  {bob.Address}\n");
+            coin.MinePendingTransactions(alice.Address);
 
-            Transaction tx = new Transaction(alice.Address, bob.Address, 25);
-            tx.SignTransaction(alice);
+            Console.WriteLine($"Початковий баланс Аліси: {coin.GetBalanceOfAddress(alice.Address)}");
 
-            coin.AddTransaction(tx);
-            coin.MinePendingTransactions(bob.Address);
+            Transaction tx1 = new Transaction(alice.Address, bob.Address, 100);
+            tx1.SignTransaction(alice);
+            Console.WriteLine("\nСпроба відправити перші 100 монет Бобу:");
+            coin.AddTransaction(tx1);
+
+            Transaction tx2 = new Transaction(alice.Address, charlie.Address, 100);
+            tx2.SignTransaction(alice);
+            Console.WriteLine("\nСпроба відправити ще 100 монет Карло (поки перша транзакція в Mempool):");
+            coin.AddTransaction(tx2);
         }
     }
 }

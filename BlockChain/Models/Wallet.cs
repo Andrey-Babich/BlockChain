@@ -34,7 +34,7 @@ namespace BlockChain.Models
             }
         }
 
-        public byte[] SignData(string data)
+        public byte[] Sign(string data)
         {
             using (RSA rsa = RSA.Create())
             {

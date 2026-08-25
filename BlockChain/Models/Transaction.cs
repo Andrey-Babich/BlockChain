@@ -7,8 +7,8 @@ namespace BlockChain.Models
     public class Transaction
     {
         public string Id { get; set; }
-        public string Sender { get; set; }
-        public string Recipient { get; set; }
+        public string From { get; set; }
+        public string To { get; set; }
         public decimal Amount { get; set; }
         public DateTime Timestamp { get; set; }
         public int UnlockBlockIndex { get; set; }
@@ -16,10 +16,22 @@ namespace BlockChain.Models
         public string SenderPublicKey { get; set; }
         public byte[] Signature { get; set; }
 
-        public Transaction(string sender, string recipient, decimal amount, int unlockBlockIndex = 0, bool isVip = false)
+        public string Sender
         {
-            Sender = sender;
-            Recipient = recipient;
+            get => From;
+            set => From = value;
+        }
+
+        public string Recipient
+        {
+            get => To;
+            set => To = value;
+        }
+
+        public Transaction(string from, string to, decimal amount, int unlockBlockIndex = 0, bool isVip = false)
+        {
+            From = from;
+            To = to;
             Amount = amount;
             Timestamp = DateTime.Now;
             UnlockBlockIndex = unlockBlockIndex;
@@ -29,7 +41,7 @@ namespace BlockChain.Models
 
         public string GenerateHashId()
         {
-            string rawData = $"{Sender}{Recipient}{Amount}{Timestamp:yyyy-MM-dd HH:mm:ss.fff}";
+            string rawData = $"{From}{To}{Amount}{Timestamp:yyyy-MM-dd HH:mm:ss.fff}";
             using (SHA256 sha256 = SHA256.Create())
             {
                 byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(rawData));
@@ -44,12 +56,12 @@ namespace BlockChain.Models
 
         public void SignTransaction(Wallet wallet)
         {
-            if (wallet.Address != Sender)
+            if (wallet.Address != From)
             {
-                throw new InvalidOperationException("Неможливо підписати транзакцію чужим гаманцем!");
+                throw new InvalidOperationException("Помилка підпису.");
             }
             SenderPublicKey = wallet.PublicKey;
-            Signature = wallet.SignData(Id);
+            Signature = wallet.Sign(Id);
         }
     }
 }
