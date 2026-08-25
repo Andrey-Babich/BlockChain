@@ -40,35 +40,60 @@ namespace BlockChain.Services
 
         public void AddTransaction(Transaction tx)
         {
-            bool isDuplicate = Chain.Any(block => block.Transactions.Any(t => t.Id == tx.Id));
+            if (!TransactionService.Validate(tx))
+            {
+                Console.WriteLine("[MEMPOOL] Транзакцію відхилено: недійсний підпис.");
+                return;
+            }
+
+            bool isDuplicate = Chain.Any(block => block.Transactions.Any(t => t.Id == tx.Id))
+                              || Mempool.Any(t => t.Id == tx.Id);
             if (isDuplicate)
             {
-                Console.WriteLine($"[ПОМИЛКА] Помилка: Дублікат транзакції ({tx.Id[..8]}...)! Транзакцію відхилено.");
-                throw new InvalidOperationException("Дублікат транзакції");
+                Console.WriteLine("Дублікат транзакції");
+                return;
             }
 
             Mempool.Add(tx);
-            Console.WriteLine($"[MEMPOOL] Транзакцію [{tx.Id[..8]}...] від {tx.Sender} додано до Mempool (UnlockBlockIndex: {tx.UnlockBlockIndex}).");
         }
 
         public void MinePendingTransactions(string minerAddress)
         {
             int nextBlockIndex = Chain.Count;
+            Dictionary<string, decimal> pendingBalances = new Dictionary<string, decimal>();
+            List<Transaction> validTransactions = new List<Transaction>();
 
-            var eligibleTransactions = Mempool
+            var candidates = Mempool
                 .Where(tx => tx.UnlockBlockIndex <= nextBlockIndex)
-                .Take(MaxBlockSize)
+                .OrderByDescending(tx => tx.IsVip)
                 .ToList();
 
-            if (eligibleTransactions.Count == 0 && Mempool.Count == 0)
+            foreach (var tx in candidates)
             {
-                Console.WriteLine("[МАЙНІНГ] Mempool порожній. Немає транзакцій для майнінгу.");
-                return;
+                if (validTransactions.Count >= MaxBlockSize)
+                    break;
+
+                if (string.IsNullOrEmpty(tx.Sender) || tx.Sender == "SYSTEM")
+                {
+                    validTransactions.Add(tx);
+                    continue;
+                }
+
+                if (!pendingBalances.ContainsKey(tx.Sender))
+                {
+                    pendingBalances[tx.Sender] = GetBalanceOfAddress(tx.Sender);
+                }
+
+                if (pendingBalances[tx.Sender] >= tx.Amount)
+                {
+                    pendingBalances[tx.Sender] -= tx.Amount;
+                    validTransactions.Add(tx);
+                }
             }
 
-            var blockTransactions = new List<Transaction>(eligibleTransactions);
+            var blockTransactions = new List<Transaction>(validTransactions);
 
-            Transaction rewardTx = new Transaction(null, minerAddress, MiningReward);
+            Transaction rewardTx = new Transaction("SYSTEM", minerAddress, MiningReward);
             blockTransactions.Add(rewardTx);
 
             Block newBlock = new Block(DateTime.Now, blockTransactions, GetLatestBlock().Hash)
@@ -76,18 +101,29 @@ namespace BlockChain.Services
                 Index = nextBlockIndex
             };
 
-            Console.WriteLine($"\n--- Початок майнінгу Блоку #{nextBlockIndex} ---");
-            Console.WriteLine($"Взето транзакцій з Mempool: {eligibleTransactions.Count} | Залишилось чекати у Mempool: {Mempool.Count - eligibleTransactions.Count}");
-
             MiningService.MineBlock(newBlock, Difficulty);
             Chain.Add(newBlock);
 
-            foreach (var tx in eligibleTransactions)
+            foreach (var tx in validTransactions)
             {
                 Mempool.Remove(tx);
             }
+        }
 
-            Console.WriteLine($"Блок #{newBlock.Index} успішно змайнено! Залишок у Mempool: {Mempool.Count}");
+        public decimal GetTotalSupply()
+        {
+            decimal totalSupply = 0;
+            foreach (Block block in Chain)
+            {
+                foreach (Transaction tx in block.Transactions)
+                {
+                    if (tx.Sender == "SYSTEM" || string.IsNullOrEmpty(tx.Sender))
+                    {
+                        totalSupply += tx.Amount;
+                    }
+                }
+            }
+            return totalSupply;
         }
 
         public decimal GetBalanceOfAddress(string address)

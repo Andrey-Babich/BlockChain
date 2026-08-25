@@ -12,14 +12,18 @@ namespace BlockChain.Models
         public decimal Amount { get; set; }
         public DateTime Timestamp { get; set; }
         public int UnlockBlockIndex { get; set; }
+        public bool IsVip { get; set; }
+        public string SenderPublicKey { get; set; }
+        public byte[] Signature { get; set; }
 
-        public Transaction(string sender, string recipient, decimal amount, int unlockBlockIndex = 0)
+        public Transaction(string sender, string recipient, decimal amount, int unlockBlockIndex = 0, bool isVip = false)
         {
             Sender = sender;
             Recipient = recipient;
             Amount = amount;
             Timestamp = DateTime.Now;
             UnlockBlockIndex = unlockBlockIndex;
+            IsVip = isVip;
             Id = GenerateHashId();
         }
 
@@ -36,6 +40,16 @@ namespace BlockChain.Models
                 }
                 return builder.ToString();
             }
+        }
+
+        public void SignTransaction(Wallet wallet)
+        {
+            if (wallet.Address != Sender)
+            {
+                throw new InvalidOperationException("Неможливо підписати транзакцію чужим гаманцем!");
+            }
+            SenderPublicKey = wallet.PublicKey;
+            Signature = wallet.SignData(Id);
         }
     }
 }
