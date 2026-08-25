@@ -9,6 +9,7 @@ namespace BlockChain.Models
         public DateTime Timestamp { get; set; }
         public List<Transaction> Transactions { get; set; }
         public string PreviousHash { get; set; }
+        public string MerkleRoot { get; set; }
         public string Hash { get; set; }
         public int Nonce { get; set; }
 
@@ -16,10 +17,16 @@ namespace BlockChain.Models
         {
             Index = index;
             Timestamp = timestamp;
-            Transactions = transactions;
+            Transactions = transactions ?? new List<Transaction>();
             PreviousHash = previousHash;
+            MerkleRoot = "";
             Hash = "";
             Nonce = 0;
+        }
+
+        public Block()
+        {
+            Transactions = new List<Transaction>();
         }
     }
 }

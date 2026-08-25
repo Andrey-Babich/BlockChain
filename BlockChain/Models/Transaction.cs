@@ -6,16 +6,13 @@ namespace BlockChain.Models
 {
     public class Transaction
     {
-        public string Id { get; set; }
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public string From { get; set; }
         public string To { get; set; }
         public decimal Amount { get; set; }
-        public decimal Fee { get; set; }
-        public DateTime Timestamp { get; set; }
-        public int UnlockBlockIndex { get; set; }
-        public bool IsVip { get; set; }
+        public string Signature { get; set; }
         public string SenderPublicKey { get; set; }
-        public byte[] Signature { get; set; }
+        public DateTime Timestamp { get; set; } = DateTime.Now;
 
         public string Sender
         {
@@ -29,41 +26,41 @@ namespace BlockChain.Models
             set => To = value;
         }
 
-        public Transaction(string from, string to, decimal amount, decimal fee = 0, int unlockBlockIndex = 0, bool isVip = false)
+        public Transaction(string from, string to, decimal amount, string signature = "", string senderPublicKey = "")
         {
             From = from;
             To = to;
             Amount = amount;
-            Fee = fee;
-            Timestamp = DateTime.UtcNow;
-            UnlockBlockIndex = unlockBlockIndex;
-            IsVip = isVip;
-            Id = GenerateHashId();
+            Signature = signature;
+            SenderPublicKey = senderPublicKey;
+            Timestamp = DateTime.Now;
+            Id = Guid.NewGuid().ToString("N");
         }
 
-        public string GenerateHashId()
+        public Transaction() { }
+
+        public bool VerifySignature()
         {
-            string rawData = $"{From}{To}{Amount}{Fee}{Timestamp:yyyy-MM-dd HH:mm:ss.fff}";
-            using (SHA256 sha256 = SHA256.Create())
+            if (string.IsNullOrEmpty(Signature) || string.IsNullOrEmpty(SenderPublicKey))
             {
-                byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(rawData));
-                StringBuilder builder = new StringBuilder();
-                foreach (byte b in bytes)
+                return true;
+            }
+
+            try
+            {
+                byte[] dataBytes = Encoding.UTF8.GetBytes($"{From}{To}{Amount}");
+                byte[] signatureBytes = Convert.FromBase64String(Signature);
+
+                using (var rsa = RSA.Create())
                 {
-                    builder.Append(b.ToString("x2"));
+                    rsa.FromXmlString(SenderPublicKey);
+                    return rsa.VerifyData(dataBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
                 }
-                return builder.ToString();
             }
-        }
-
-        public void SignTransaction(Wallet wallet)
-        {
-            if (wallet.Address != From)
+            catch
             {
-                throw new InvalidOperationException("Помилка підпису.");
+                return false;
             }
-            SenderPublicKey = wallet.PublicKey;
-            Signature = wallet.Sign(Id);
         }
     }
 }
