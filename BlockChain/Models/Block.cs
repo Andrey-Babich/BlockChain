@@ -12,13 +12,13 @@ namespace BlockChain.Models
         public string Hash { get; set; }
         public int Nonce { get; set; }
 
-        public Block(DateTime timestamp, List<Transaction> transactions, string previousHash = "")
+        public Block(int index, DateTime timestamp, List<Transaction> transactions, string previousHash = "")
         {
-            Index = 0;
+            Index = index;
             Timestamp = timestamp;
-            Transactions = transactions ?? new List<Transaction>();
+            Transactions = transactions;
             PreviousHash = previousHash;
-            Hash = string.Empty;
+            Hash = "";
             Nonce = 0;
         }
     }

@@ -1,205 +1,62 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using BlockChain.Models;
 
 namespace BlockChain.Services
 {
     public class BlockChainService
     {
-        public List<Block> Chain { get; private set; }
-        public List<Transaction> Mempool { get; private set; }
+        public List<Block> Chain { get; set; }
         public int Difficulty { get; set; }
-        public decimal MiningReward { get; set; }
-        public int MaxBlockSize { get; set; } = 3;
-        public int HalvingInterval { get; set; } = 2;
+        public List<Transaction> PendingTransactions { get; set; }
 
-        public BlockChainService(int difficulty = 2, decimal miningReward = 50)
+        public BlockChainService(int difficulty = 2)
         {
-            Chain = new List<Block>();
-            Mempool = new List<Transaction>();
+            Chain = new List<Block> { CreateGenesisBlock() };
             Difficulty = difficulty;
-            MiningReward = miningReward;
-
-            CreateGenesisBlock();
+            PendingTransactions = new List<Transaction>();
         }
 
-        private void CreateGenesisBlock()
+        private Block CreateGenesisBlock()
         {
-            Block genesisBlock = new Block(DateTime.Now, new List<Transaction>(), "0")
-            {
-                Index = 0
-            };
-            MiningService.MineBlock(genesisBlock, Difficulty);
-            Chain.Add(genesisBlock);
+            Block genesisBlock = new Block(0, DateTime.Now, new List<Transaction>(), "0");
+            genesisBlock.Hash = HashingService.CalculateHash(genesisBlock);
+            return genesisBlock;
         }
 
         public Block GetLatestBlock()
         {
-            return Chain[^1];
+            return Chain[Chain.Count - 1];
         }
 
-        public void AddTransaction(Transaction tx)
+        public void AddTransaction(Transaction transaction)
         {
-            if (!TransactionService.Validate(tx))
-            {
-                Console.WriteLine("Транзакцію відхилено системою безпеки.");
-                return;
-            }
-
-            bool isDuplicate = Chain.Any(block => block.Transactions.Any(t => t.Id == tx.Id))
-                              || Mempool.Any(t => t.Id == tx.Id);
-            if (isDuplicate)
-            {
-                Console.WriteLine("Дублікат транзакції");
-                return;
-            }
-
-            if (tx.From != "SYSTEM" && !string.IsNullOrEmpty(tx.From))
-            {
-                decimal currentBalance = GetBalanceOfAddress(tx.From);
-                decimal frozenBalance = Mempool.Where(t => t.From == tx.From).Sum(t => t.Amount + t.Fee);
-                decimal availableBalance = currentBalance - frozenBalance;
-
-                if (availableBalance < (tx.Amount + tx.Fee))
-                {
-                    Console.WriteLine("Недостатньо коштів! Частина вашого балансу вже зарезервована в Mempool");
-                    return;
-                }
-            }
-
-            Mempool.Add(tx);
-            Console.WriteLine($"Транзакцію [{tx.Id[..8]}...] додано до Mempool.");
+            PendingTransactions.Add(transaction);
         }
 
         public void MinePendingTransactions(string minerAddress)
         {
-            int nextBlockIndex = Chain.Count;
-            Dictionary<string, decimal> pendingBalances = new Dictionary<string, decimal>();
-            List<Transaction> validTransactions = new List<Transaction>();
-
-            var candidates = Mempool
-                .Where(tx => tx.UnlockBlockIndex <= nextBlockIndex)
-                .OrderByDescending(tx => tx.Fee)
-                .ThenByDescending(tx => tx.IsVip)
-                .ToList();
-
-            foreach (var tx in candidates)
-            {
-                if (validTransactions.Count >= MaxBlockSize)
-                    break;
-
-                if (string.IsNullOrEmpty(tx.From) || tx.From == "SYSTEM")
-                {
-                    validTransactions.Add(tx);
-                    continue;
-                }
-
-                if (!pendingBalances.ContainsKey(tx.From))
-                {
-                    pendingBalances[tx.From] = GetBalanceOfAddress(tx.From);
-                }
-
-                if (pendingBalances[tx.From] >= (tx.Amount + tx.Fee))
-                {
-                    pendingBalances[tx.From] -= (tx.Amount + tx.Fee);
-                    validTransactions.Add(tx);
-                }
-            }
-
-            var blockTransactions = new List<Transaction>(validTransactions);
-
-            int pastHalvings = nextBlockIndex / HalvingInterval;
-            decimal baseReward = MiningReward / (decimal)Math.Pow(2, pastHalvings);
-            decimal totalFees = validTransactions.Sum(tx => tx.Fee);
-            decimal totalReward = baseReward + totalFees;
-
-            Transaction rewardTx = new Transaction("SYSTEM", minerAddress, totalReward);
-            blockTransactions.Add(rewardTx);
-
-            Block newBlock = new Block(DateTime.Now, blockTransactions, GetLatestBlock().Hash)
-            {
-                Index = nextBlockIndex
-            };
-
-            MiningService.MineBlock(newBlock, Difficulty);
-            Chain.Add(newBlock);
-
-            foreach (var tx in validTransactions)
-            {
-                Mempool.Remove(tx);
-            }
-        }
-
-        public decimal GetTotalSupply()
-        {
-            decimal minted = 0;
-            decimal burned = 0;
-
-            foreach (Block block in Chain)
-            {
-                foreach (Transaction tx in block.Transactions)
-                {
-                    if (tx.From == "SYSTEM" || string.IsNullOrEmpty(tx.From))
-                    {
-                        minted += tx.Amount;
-                    }
-                    if (tx.To == "BURN")
-                    {
-                        burned += tx.Amount;
-                    }
-                }
-            }
-
-            return minted - burned;
-        }
-
-        public decimal GetBalanceOfAddress(string address)
-        {
-            decimal balance = 0;
-            foreach (Block block in Chain)
-            {
-                foreach (Transaction tx in block.Transactions)
-                {
-                    if (tx.From == address) balance -= (tx.Amount + tx.Fee);
-                    if (tx.To == address) balance += tx.Amount;
-                }
-            }
-            return balance;
+            Block block = new Block(Chain.Count, DateTime.Now, PendingTransactions, GetLatestBlock().Hash);
+            MiningService.MineBlock(block, Difficulty);
+            Chain.Add(block);
+            PendingTransactions = new List<Transaction>();
         }
 
         public bool IsChainValid()
         {
-            if (Chain.Count == 0) return false;
-
-            Block genesisBlock = Chain[0];
-            if (genesisBlock.Hash != HashingService.CalculateHash(genesisBlock)) return false;
-            if (genesisBlock.PreviousHash != "0" && !string.IsNullOrEmpty(genesisBlock.PreviousHash)) return false;
-
             for (int i = 1; i < Chain.Count; i++)
             {
                 Block currentBlock = Chain[i];
                 Block previousBlock = Chain[i - 1];
 
-                if (currentBlock.Hash != HashingService.CalculateHash(currentBlock)) return false;
-                if (currentBlock.PreviousHash != previousBlock.Hash) return false;
-
-                Transaction systemTx = currentBlock.Transactions.FirstOrDefault(tx => tx.From == "SYSTEM" || string.IsNullOrEmpty(tx.From));
-                if (systemTx != null)
+                if (currentBlock.Hash != HashingService.CalculateHash(currentBlock))
                 {
-                    int pastHalvings = currentBlock.Index / HalvingInterval;
-                    decimal expectedBaseReward = MiningReward / (decimal)Math.Pow(2, pastHalvings);
-                    decimal totalFeesInBlock = currentBlock.Transactions
-                        .Where(tx => tx != systemTx && tx.From != "SYSTEM" && !string.IsNullOrEmpty(tx.From))
-                        .Sum(tx => tx.Fee);
+                    return false;
+                }
 
-                    decimal expectedTotalReward = expectedBaseReward + totalFeesInBlock;
-
-                    if (systemTx.Amount != expectedTotalReward)
-                    {
-                        Console.WriteLine($"[ПОМИЛКА ЕМІСІЇ] Блок #{currentBlock.Index}: очікувалось {expectedTotalReward}, отримано {systemTx.Amount}");
-                        return false;
-                    }
+                if (currentBlock.PreviousHash != previousBlock.Hash)
+                {
+                    return false;
                 }
             }
             return true;

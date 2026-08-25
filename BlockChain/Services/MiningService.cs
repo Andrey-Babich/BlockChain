@@ -2,13 +2,12 @@
 
 namespace BlockChain.Services
 {
-    public class MiningService
+    public static class MiningService
     {
         public static void MineBlock(Block block, int difficulty)
         {
-            string leadingZeros = new string('0', difficulty);
-
-            while (string.IsNullOrEmpty(block.Hash) || !block.Hash.StartsWith(leadingZeros))
+            string target = new string('0', difficulty);
+            while (block.Hash == null || !block.Hash.StartsWith(target))
             {
                 block.Nonce++;
                 block.Hash = HashingService.CalculateHash(block);

@@ -1,6 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
+using Newtonsoft.Json;
 using BlockChain.Models;
 
 namespace BlockChain.Services
@@ -9,9 +9,7 @@ namespace BlockChain.Services
     {
         public static string CalculateHash(Block block)
         {
-            string transactionsJson = JsonSerializer.Serialize(block.Transactions);
-            string rawData = $"{block.Index}{block.Timestamp:yyyy-MM-dd HH:mm:ss.fff}{block.PreviousHash}{transactionsJson}{block.Nonce}";
-
+            string rawData = $"{block.Index}-{block.Timestamp}-{JsonConvert.SerializeObject(block.Transactions)}-{block.PreviousHash}-{block.Nonce}";
             using (SHA256 sha256 = SHA256.Create())
             {
                 byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(rawData));
