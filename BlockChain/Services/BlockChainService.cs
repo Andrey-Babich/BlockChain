@@ -58,10 +58,10 @@ namespace BlockChain.Services
             if (tx.From != "SYSTEM" && !string.IsNullOrEmpty(tx.From))
             {
                 decimal currentBalance = GetBalanceOfAddress(tx.From);
-                decimal frozenBalance = Mempool.Where(t => t.From == tx.From).Sum(t => t.Amount);
+                decimal frozenBalance = Mempool.Where(t => t.From == tx.From).Sum(t => t.Amount + t.Fee);
                 decimal availableBalance = currentBalance - frozenBalance;
 
-                if (availableBalance < tx.Amount)
+                if (availableBalance < (tx.Amount + tx.Fee))
                 {
                     Console.WriteLine("Недостатньо коштів! Частина вашого балансу вже зарезервована в Mempool");
                     return;
@@ -80,7 +80,8 @@ namespace BlockChain.Services
 
             var candidates = Mempool
                 .Where(tx => tx.UnlockBlockIndex <= nextBlockIndex)
-                .OrderByDescending(tx => tx.IsVip)
+                .OrderByDescending(tx => tx.Fee)
+                .ThenByDescending(tx => tx.IsVip)
                 .ToList();
 
             foreach (var tx in candidates)
@@ -99,9 +100,9 @@ namespace BlockChain.Services
                     pendingBalances[tx.From] = GetBalanceOfAddress(tx.From);
                 }
 
-                if (pendingBalances[tx.From] >= tx.Amount)
+                if (pendingBalances[tx.From] >= (tx.Amount + tx.Fee))
                 {
-                    pendingBalances[tx.From] -= tx.Amount;
+                    pendingBalances[tx.From] -= (tx.Amount + tx.Fee);
                     validTransactions.Add(tx);
                 }
             }
@@ -109,9 +110,11 @@ namespace BlockChain.Services
             var blockTransactions = new List<Transaction>(validTransactions);
 
             int pastHalvings = nextBlockIndex / HalvingInterval;
-            decimal currentReward = MiningReward / (decimal)Math.Pow(2, pastHalvings);
+            decimal baseReward = MiningReward / (decimal)Math.Pow(2, pastHalvings);
+            decimal totalFees = validTransactions.Sum(tx => tx.Fee);
+            decimal totalReward = baseReward + totalFees;
 
-            Transaction rewardTx = new Transaction("SYSTEM", minerAddress, currentReward);
+            Transaction rewardTx = new Transaction("SYSTEM", minerAddress, totalReward);
             blockTransactions.Add(rewardTx);
 
             Block newBlock = new Block(DateTime.Now, blockTransactions, GetLatestBlock().Hash)
@@ -158,7 +161,7 @@ namespace BlockChain.Services
             {
                 foreach (Transaction tx in block.Transactions)
                 {
-                    if (tx.From == address) balance -= tx.Amount;
+                    if (tx.From == address) balance -= (tx.Amount + tx.Fee);
                     if (tx.To == address) balance += tx.Amount;
                 }
             }
@@ -185,11 +188,16 @@ namespace BlockChain.Services
                 if (systemTx != null)
                 {
                     int pastHalvings = currentBlock.Index / HalvingInterval;
-                    decimal expectedReward = MiningReward / (decimal)Math.Pow(2, pastHalvings);
+                    decimal expectedBaseReward = MiningReward / (decimal)Math.Pow(2, pastHalvings);
+                    decimal totalFeesInBlock = currentBlock.Transactions
+                        .Where(tx => tx != systemTx && tx.From != "SYSTEM" && !string.IsNullOrEmpty(tx.From))
+                        .Sum(tx => tx.Fee);
 
-                    if (systemTx.Amount > expectedReward)
+                    decimal expectedTotalReward = expectedBaseReward + totalFeesInBlock;
+
+                    if (systemTx.Amount != expectedTotalReward)
                     {
-                        Console.WriteLine($"[ПОМИЛКА ЕМІСІЇ] Блок #{currentBlock.Index}: очікувалось {expectedReward}, отримано {systemTx.Amount}");
+                        Console.WriteLine($"[ПОМИЛКА ЕМІСІЇ] Блок #{currentBlock.Index}: очікувалось {expectedTotalReward}, отримано {systemTx.Amount}");
                         return false;
                     }
                 }

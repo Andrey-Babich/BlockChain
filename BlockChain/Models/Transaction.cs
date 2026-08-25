@@ -10,6 +10,7 @@ namespace BlockChain.Models
         public string From { get; set; }
         public string To { get; set; }
         public decimal Amount { get; set; }
+        public decimal Fee { get; set; }
         public DateTime Timestamp { get; set; }
         public int UnlockBlockIndex { get; set; }
         public bool IsVip { get; set; }
@@ -28,12 +29,13 @@ namespace BlockChain.Models
             set => To = value;
         }
 
-        public Transaction(string from, string to, decimal amount, int unlockBlockIndex = 0, bool isVip = false)
+        public Transaction(string from, string to, decimal amount, decimal fee = 0, int unlockBlockIndex = 0, bool isVip = false)
         {
             From = from;
             To = to;
             Amount = amount;
-            Timestamp = DateTime.Now;
+            Fee = fee;
+            Timestamp = DateTime.UtcNow;
             UnlockBlockIndex = unlockBlockIndex;
             IsVip = isVip;
             Id = GenerateHashId();
@@ -41,7 +43,7 @@ namespace BlockChain.Models
 
         public string GenerateHashId()
         {
-            string rawData = $"{From}{To}{Amount}{Timestamp:yyyy-MM-dd HH:mm:ss.fff}";
+            string rawData = $"{From}{To}{Amount}{Fee}{Timestamp:yyyy-MM-dd HH:mm:ss.fff}";
             using (SHA256 sha256 = SHA256.Create())
             {
                 byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(rawData));

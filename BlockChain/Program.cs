@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using BlockChain.Models;
 using BlockChain.Services;
 
@@ -10,25 +11,26 @@ namespace BlockChain
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-            BlockChainService coin = new BlockChainService(difficulty: 2, miningReward: 100);
+            BlockChainService coin = new BlockChainService(difficulty: 2, miningReward: 50);
 
             Wallet alice = new Wallet();
             Wallet bob = new Wallet();
-            Wallet charlie = new Wallet();
 
             coin.MinePendingTransactions(alice.Address);
 
-            Console.WriteLine($"Початковий баланс Аліси: {coin.GetBalanceOfAddress(alice.Address)}");
+            Transaction tx = new Transaction(alice.Address, bob.Address, 10, fee: 5);
+            tx.SignTransaction(alice);
+            coin.AddTransaction(tx);
 
-            Transaction tx1 = new Transaction(alice.Address, bob.Address, 100);
-            tx1.SignTransaction(alice);
-            Console.WriteLine("\nСпроба відправити перші 100 монет Бобу:");
-            coin.AddTransaction(tx1);
+            coin.MinePendingTransactions(bob.Address);
 
-            Transaction tx2 = new Transaction(alice.Address, charlie.Address, 100);
-            tx2.SignTransaction(alice);
-            Console.WriteLine("\nСпроба відправити ще 100 монет Карло (поки перша транзакція в Mempool):");
-            coin.AddTransaction(tx2);
+            Console.WriteLine($"Перевірка валідності (чесна нагорода + комісія): {coin.IsChainValid()}");
+
+            Transaction systemTx = coin.Chain[2].Transactions.First(t => t.From == "SYSTEM" || string.IsNullOrEmpty(t.From));
+            systemTx.Amount += 100;
+            MiningService.MineBlock(coin.Chain[2], coin.Difficulty);
+
+            Console.WriteLine($"Перевірка валідності після підробки системної транзакції: {coin.IsChainValid()}");
         }
     }
 }
